@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace dxdec {
@@ -8,6 +9,16 @@ enum class ShaderType {
   UNDEFINED,
   VERTEX,
   PIXEL,
+};
+
+enum class Error {
+  NO_ERROR,
+  FILE_FAIL,
+  INVALID_HEADER,
+  INVALID_TAG,
+  UNKNOWN_VERSION,
+  UNKNOWN_INSTRUCTION,
+  UNSUPPORTED
 };
 
 enum class OpCode : uint16_t {
@@ -60,7 +71,7 @@ enum class OpCode : uint16_t {
   MOVA,
   DEFB,
   DEFI,
-  TEXCOORD,
+  TEXCOORD = 64,
   TEXKILL,
   TEX,
   TEXBEM,
@@ -99,16 +110,88 @@ enum class OpCode : uint16_t {
   FORCE_DWORD
 };
 
-struct Parameter
-{
-  uint16_t reg;
-  uint8_t swizzle;
+enum class RegisterType {
+  TEMP,
+  INPUT,
+  CONST,
+  ADDR = 3,    // Only VS
+  TEXTURE = 3, // Only PS
+  RASTOUT,
+  ATTROUT,
+  TEXCRDOUT,
+  OUTPUT,
+  CONSTINT,
+  COLOROUT,
+  DEPTHOUT,
+  SAMPLER,
+  CONST2,
+  CONST3,
+  CONST4,
+  CONSTBOOL,
+  LOOP,
+  TEMPFLOAT16,
+  MISCTYPE,
+  LABEL,
+  PREDICATE,
+  FORCE_DWORD
 };
+
+enum class SourceModifier : uint8_t {
+  NONE,
+  NEGATE,
+  BIAS,
+  BIAS_AND_NEGATE,
+  SIGN,
+  SIGN_AND_NEGATE,
+  COMPLEMENT,
+  X2,            // PS 1_4 upwards
+  X2_AND_NEGATE, // PS 1_4 upwards
+  DIVIDE_BY_Z,   // PS 1_4 upwards
+  DIVIDE_BY_W,   // PS 1_4 upwards
+  ABS,
+  ABS_AND_NEGATE,
+  NOT
+};
+
+struct SourceParameter {
+  uint16_t reg_num : 11;
+  uint8_t reg_type_2 : 2;
+  uint8_t rel_addr : 1;
+  uint8_t reserved : 2;
+  uint8_t x_swizzle : 2;
+  uint8_t y_swizzle : 2;
+  uint8_t z_swizzle : 2;
+  uint8_t w_swizzle : 2;
+  SourceModifier source_modifier : 4;
+  uint8_t reg_type_1 : 3;
+  uint8_t lastbit : 1;
+};
+
+static_assert(sizeof(SourceParameter) == sizeof(uint32_t),
+              "SourceParameter struct compiles with wrong size");
+
+struct DestinationParameter {
+  uint16_t reg_num : 11;
+  uint8_t reg_type_2 : 2;
+  uint8_t rel_addr : 1;
+  uint8_t reserved : 2;
+  uint8_t x_write : 1;
+  uint8_t y_write : 1;
+  uint8_t z_write : 1;
+  uint8_t w_write : 1;
+  uint8_t result_modifier : 4;
+  uint8_t shift_scale : 4;
+  uint8_t reg_type_1 : 3;
+  uint8_t lastbit : 1;
+};
+
+static_assert(sizeof(DestinationParameter) == sizeof(uint32_t),
+              "DestinationParameter struct compiles with wrong size");
 
 struct Instruction {
   OpCode code;
-  Parameter source;
-  Parameter destination;
+  std::vector<SourceParameter> source;
+  std::vector<DestinationParameter> destination;
 };
 
 struct DXBC {
@@ -118,7 +201,9 @@ struct DXBC {
   std::vector<Instruction> Instructions;
 };
 
-bool LoadBytecodeFromMemory(uint8_t *data, size_t data_size, DXBC &result);
-bool LoadBytecodeFromFile(const char *filepath, DXBC &result);
+Error LoadBytecodeFromMemory(uint8_t *data, size_t data_size, DXBC &result);
+Error LoadBytecodeFromFile(const char *filepath, DXBC &result);
+
+bool DisassembleBytecode(const DXBC &input, std::string &output);
 
 } // namespace dxdec
