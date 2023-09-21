@@ -278,6 +278,23 @@ static const char *GetOpName(OpCode op) {
   return nullptr;
 }
 
+static const char *GetOpSuffix(Instruction i) {
+  if (i.destination.size() == 1) {
+    switch (i.destination[0].shift_scale) {
+    case 1:
+      return "_x2";
+    case 2:
+      return "_x4";
+    case 3:
+      return "_x8";
+    default:
+      break;
+    }
+  }
+
+  return "";
+}
+
 static std::string GetRegisterName(RegisterType type, int num,
                                    bool is_ps = false) {
   std::string name;
@@ -390,7 +407,7 @@ bool dxdec::DisassembleBytecode(const DXBC &input, std::string &output) {
 
   bool is_ps = input.type == ShaderType::PIXEL;
   for (auto &instr : input.Instructions) {
-    ss << GetOpName(instr.code);
+    ss << GetOpName(instr.code) << GetOpSuffix(instr);
 
     for (const auto &dst : instr.destination) {
       auto reg_type = GetRegisterType(dst);
